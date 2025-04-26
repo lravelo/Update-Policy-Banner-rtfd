@@ -1,0 +1,207 @@
+#!/bin/bash
+
+#########################################################################################################################################################################
+# MacJediWizard Consulting, Inc.
+# Copyright (c) 2025 MacJediWizard Consulting, Inc.
+# All rights reserved.
+# Created by: William Grzybowski
+#
+# Script: update_policy_banner_rtfd.sh
+#
+# Description: - This script will update the macOS policy banner located in /Library/Security to use an .rtfd bundle for macOS 15 and above.
+#               - The new policy banner is expected to be staged in /tmp/new_policy_banner.rtfd by a separate package or installer.
+#               - This script will:
+#                   - Create temporary working directories
+#                   - Backup any existing PolicyBanner.rtfd found in /Library/Security
+#                   - Remove the old policy banner safely
+#                   - Replace it with the new .rtfd policy banner
+#                   - Apply correct permissions and ownership recursively
+#                   - Verify basic FileVault policy banner configuration status
+#                   - Log all actions, warnings, errors, and debug information into /var/log/policy_banner_update.log
+#
+# Notes:
+# - Must be run as root (required for filesystem and permission changes)
+# - DEBUG_MODE can be enabled internally for more verbose logging if needed
+# - Designed for use inside Jamf Pro via custom triggers or postinstall scripts
+# - Assumes that the new banner is already deployed to /tmp before execution
+#
+# License:
+# This script is licensed under the MIT License.
+# See the LICENSE file in the root of this repository for details.
+#
+# Change Log:
+# Version 1.0.0 - 2025-04-26
+#   - Initial creation of script.
+#   - Added full support for replacing PolicyBanner.rtfd on macOS 15+.
+#   - Implemented backup, remove, and replace operations with proper permissions and ownership.
+#   - Integrated full logging system to /var/log/policy_banner_update.log.
+#   - Designed script for modular deployment via Jamf Pro custom triggers or postinstall actions.
+#
+#########################################################################################################################################################################
+
+set -o pipefail
+set -u
+set -e
+
+# Global Variables
+STAGING_DIR="/tmp"
+TEMP_DIR="${STAGING_DIR}/banner_temp"
+NEW_BANNER_NAME="new_policy_banner.rtfd"
+TARGET_BANNER_NAME="PolicyBanner.rtfd"
+NEW_BANNER_PATH="${STAGING_DIR}/${NEW_BANNER_NAME}"
+INSTALL_DIR="/Library/Security"
+TARGET_BANNER_PATH="${INSTALL_DIR}/${TARGET_BANNER_NAME}"
+LOG_FILE="/var/log/policy_banner_update.log"
+DEBUG_MODE=0
+
+trap 'cleanup' EXIT HUP INT QUIT TERM
+
+# Logging Functions
+log_info() {
+    local message="$1"
+    printf "[%s] [INFO] %s\n" "$(date "+%Y-%m-%d %H:%M:%S")" "$message" | tee -a "$LOG_FILE"
+}
+
+log_warn() {
+    local message="$1"
+    printf "[%s] [WARN] %s\n" "$(date "+%Y-%m-%d %H:%M:%S")" "$message" | tee -a "$LOG_FILE" >&2
+}
+
+log_error() {
+    local message="$1"
+    printf "[%s] [ERROR] %s\n" "$(date "+%Y-%m-%d %H:%M:%S")" "$message" | tee -a "$LOG_FILE" >&2
+}
+
+log_debug() {
+    local message="$1"
+    if [[ "$DEBUG_MODE" -eq 1 ]]; then
+        printf "[%s] [DEBUG] %s\n" "$(date "+%Y-%m-%d %H:%M:%S")" "$message" | tee -a "$LOG_FILE"
+    fi
+}
+
+# Prepare log file
+prepare_log_file() {
+    if [[ ! -f "$LOG_FILE" ]]; then
+        touch "$LOG_FILE"
+        chmod 644 "$LOG_FILE"
+    fi
+}
+
+# Create temporary directory
+create_temp_dir() {
+    if ! mkdir -p "$TEMP_DIR"; then
+        log_error "Could not create temporary directory $TEMP_DIR"
+        return 1
+    fi
+    log_debug "Temporary directory $TEMP_DIR created"
+}
+
+# Validate the new banner exists
+validate_new_banner() {
+    if [[ ! -d "$NEW_BANNER_PATH" ]]; then
+        log_error "New policy banner directory not found at $NEW_BANNER_PATH"
+        return 1
+    fi
+    log_debug "New policy banner found at $NEW_BANNER_PATH"
+}
+
+# Prepare install directory
+prepare_install_dir() {
+    if [[ ! -d "$INSTALL_DIR" ]]; then
+        if ! mkdir -p "$INSTALL_DIR"; then
+            log_error "Failed to create $INSTALL_DIR"
+            return 1
+        fi
+        log_info "Created $INSTALL_DIR"
+    fi
+}
+
+# Backup existing banner
+backup_existing_banner() {
+    if [[ -d "$TARGET_BANNER_PATH" ]]; then
+        local backup_dir;
+        backup_dir="${TEMP_DIR}/PolicyBanner_backup_$(date +%Y%m%d%H%M%S).rtfd"
+        if ! cp -R "$TARGET_BANNER_PATH" "$backup_dir"; then
+            log_error "Failed to backup existing policy banner to $backup_dir"
+            return 1
+        fi
+        log_info "Existing policy banner backed up to $backup_dir"
+    else
+        log_info "No existing policy banner to backup"
+    fi
+}
+
+# Remove old banner
+remove_old_banner() {
+    if [[ -d "$TARGET_BANNER_PATH" ]]; then
+        if ! rm -rf "$TARGET_BANNER_PATH"; then
+            log_error "Failed to remove old policy banner at $TARGET_BANNER_PATH"
+            return 1
+        fi
+        log_info "Old policy banner removed"
+    fi
+}
+
+# Replace with new banner
+replace_banner() {
+    if ! cp -R "$NEW_BANNER_PATH" "$TARGET_BANNER_PATH"; then
+        log_error "Failed to copy new policy banner to $TARGET_BANNER_PATH"
+        return 1
+    fi
+    if ! chmod -R 755 "$TARGET_BANNER_PATH"; then
+        log_error "Failed to set permissions on $TARGET_BANNER_PATH"
+        return 1
+    fi
+    if ! chown -R root:wheel "$TARGET_BANNER_PATH"; then
+        log_error "Failed to set ownership on $TARGET_BANNER_PATH"
+        return 1
+    fi
+    log_info "New policy banner deployed successfully at $TARGET_BANNER_PATH"
+}
+
+# Validate FileVault Preboot Banner
+validate_filevault_banner() {
+    local preboot_banner="/private/var/db/.PolicyBanner"
+    if [[ -e "$preboot_banner" ]]; then
+        log_info "Policy banner is configured for FileVault preboot screen"
+    else
+        log_warn "Policy banner not configured for FileVault preboot screen"
+    fi
+}
+
+# Cleanup temporary directory
+cleanup() {
+    if [[ -d "$TEMP_DIR" ]]; then
+        rm -rf "$TEMP_DIR"
+        log_debug "Temporary directory $TEMP_DIR cleaned up"
+    fi
+}
+
+# Main Execution
+main() {
+    if [[ $(id -u) -ne 0 ]]; then
+        log_error "This script must be run as root"
+        return 1
+    fi
+    
+    prepare_log_file
+    log_info "Starting policy banner update process"
+    
+    create_temp_dir || return 1
+    validate_new_banner || return 1
+    prepare_install_dir || return 1
+    backup_existing_banner || return 1
+    remove_old_banner || return 1
+    replace_banner || return 1
+    validate_filevault_banner
+    
+    log_info "Policy banner update completed"
+}
+
+main
+
+
+#########################################################################################################################################################################
+# End of Script: update_policy_banner_rtfd.sh
+# MacJediWizard Consulting, Inc. © 2025. All rights reserved.
+#########################################################################################################################################################################
