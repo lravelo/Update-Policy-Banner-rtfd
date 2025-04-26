@@ -29,6 +29,7 @@
 # This script is licensed under the MIT License.
 # See the LICENSE file in the root of this repository for details.
 #
+#
 # Change Log:
 # Version 1.0.0 - 2025-04-26
 #   - Initial creation of script.
@@ -43,9 +44,14 @@
 #       - Prevented false warnings by forcing preboot sync immediately after banner replacement.
 #
 # Version 1.2.0 - 2025-04-26
-#   - Added full Preboot update output capture to custom log file.
+#   - Captured full Preboot update output to custom log file.
 #   - Filtered diskutil output for Jamf console logs to prevent truncation.
 #   - Added macOS version-aware logic to skip unreliable /private/var/db/.PolicyBanner check on macOS 14+ (Sonoma+).
+#
+# Version 1.3.0 - 2025-04-26
+#   - Added start and end timestamps around Preboot update process.
+#   - Improved logging clarity for Preboot sync operations.
+#   - Ensured complete audit trail even when diskutil output lacks internal timestamps.
 #
 #########################################################################################################################################################################
 
@@ -171,20 +177,26 @@ replace_banner() {
 
 # Validate FileVault Preboot Banner
 validate_filevault_banner() {
-    log_info "Forcing preboot volume update to sync PolicyBanner..."
+    log_info "Starting Preboot volume update to sync PolicyBanner..."
     
     local update_log="${TEMP_DIR}/updatepreboot_output.log"
+    local start_time;
+    start_time="$(date '+%Y-%m-%d %H:%M:%S')"
     
     if ! diskutil apfs updatePreboot / > "$update_log" 2>&1; then
         log_warn "Failed to update preboot volume. Preboot banner status might not be accurate."
+        log_info "Preboot update started at $start_time and failed at $(date '+%Y-%m-%d %H:%M:%S')."
         cat "$update_log" >> "$LOG_FILE"
         return 0
     fi
     
-    # Always append full diskutil output to the custom log file
+    local end_time;
+    end_time="$(date '+%Y-%m-%d %H:%M:%S')"
+    log_info "Preboot volume update completed. Start: $start_time | End: $end_time"
+    
     cat "$update_log" >> "$LOG_FILE"
     
-    # Filter key output to display on the console for Jamf logs
+    # Filter clean summary for Jamf console
     if grep -q "Successfully wrote Encrypted Root PList File" "$update_log"; then
         log_info "Preboot update completed successfully."
     elif grep -q "Error" "$update_log"; then
@@ -193,7 +205,7 @@ validate_filevault_banner() {
         log_info "Preboot update completed with standard output."
     fi
     
-    # Now check preboot banner condition if on older macOS versions
+    # Version-aware check for policy banner
     local os_major_version;
     os_major_version=$(sw_vers -productVersion | awk -F '.' '{print $1}')
     
