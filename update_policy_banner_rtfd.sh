@@ -40,7 +40,12 @@
 # Version 1.1.0 - 2025-04-26
 #   - Improved validate_filevault_banner function:
 #       - Added diskutil apfs updatePreboot / before checking preboot banner status.
-#       - Prevents false warnings by forcing preboot sync immediately after banner replacement.
+#       - Prevented false warnings by forcing preboot sync immediately after banner replacement.
+#
+# Version 1.2.0 - 2025-04-26
+#   - Added full Preboot update output capture to custom log file.
+#   - Filtered diskutil output for Jamf console logs to prevent truncation.
+#   - Added macOS version-aware logic to skip unreliable /private/var/db/.PolicyBanner check on macOS 14+ (Sonoma+).
 #
 #########################################################################################################################################################################
 
@@ -167,8 +172,33 @@ replace_banner() {
 # Validate FileVault Preboot Banner
 validate_filevault_banner() {
     log_info "Forcing preboot volume update to sync PolicyBanner..."
-    if ! diskutil apfs updatePreboot /; then
+    
+    local update_log="${TEMP_DIR}/updatepreboot_output.log"
+    
+    if ! diskutil apfs updatePreboot / > "$update_log" 2>&1; then
         log_warn "Failed to update preboot volume. Preboot banner status might not be accurate."
+        cat "$update_log" >> "$LOG_FILE"
+        return 0
+    fi
+    
+    # Always append full diskutil output to the custom log file
+    cat "$update_log" >> "$LOG_FILE"
+    
+    # Filter key output to display on the console for Jamf logs
+    if grep -q "Successfully wrote Encrypted Root PList File" "$update_log"; then
+        log_info "Preboot update completed successfully."
+    elif grep -q "Error" "$update_log"; then
+        log_warn "Potential issues detected during Preboot update. Check detailed logs."
+    else
+        log_info "Preboot update completed with standard output."
+    fi
+    
+    # Now check preboot banner condition if on older macOS versions
+    local os_major_version;
+    os_major_version=$(sw_vers -productVersion | awk -F '.' '{print $1}')
+    
+    if [[ "$os_major_version" -ge 14 ]]; then
+        log_info "Running macOS $os_major_version detected; skipping /private/var/db/.PolicyBanner check (not reliable on macOS 14+)."
         return 0
     fi
     
