@@ -1,36 +1,41 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
----
-
 ## [1.3.0] - 2025-04-26
+
+### Added
+- Start and end timestamps around Preboot update operations for auditability.
+- Full capture of Preboot diskutil output appended to `/var/log/policy_banner_update.log`.
+- New logging entries for Preboot status and duration.
+
 ### Changed
-- Added timestamp logging at start and end of `diskutil apfs updatePreboot /` process.
-- Improved auditability by ensuring Preboot update operations have clear time window logs.
-- Enhanced reliability of operational logging without modifying diskutil's internal output.
+- Improved Preboot operation output handling for Jamf Pro console truncation prevention.
+- More precise filtering of standard vs. error Preboot outcomes.
+
+### Fixed
+- Ensured complete audit trail even when Preboot outputs lacked internal timestamps.
 
 ---
 
 ## [1.2.0] - 2025-04-26
-### Changed
-- Captured full `diskutil apfs updatePreboot /` output into the custom script log.
-- Filtered key success or error messages for Jamf Pro console log to prevent log truncation.
-- Added version detection to skip `/private/var/db/.PolicyBanner` check on macOS 14+ (Sonoma or newer).
+
+### Added
+- Captured Preboot update logs to separate output file inside temp directory.
+- Filtered diskutil preboot output cleanly for Jamf Console viewing.
+- Made policy banner validation macOS version aware.
 
 ---
 
 ## [1.1.0] - 2025-04-26
-### Changed
-- Updated `validate_filevault_banner` to run `diskutil apfs updatePreboot /` before checking for preboot banner.
-- Eliminated false preboot warnings by forcing preboot volume sync immediately after banner replacement.
+
+### Added
+- Forced Preboot volume update after replacing PolicyBanner.
+- Prevented false positive warnings due to Preboot lag.
 
 ---
 
 ## [1.0.0] - 2025-04-26
+
 ### Added
-- Initial creation of `update_policy_banner_rtfd.sh`.
-- Support for replacing PolicyBanner.rtfd in `/Library/Security/` for macOS 15 and above.
-- Implemented backup, remove, and replace logic with correct permissions and ownership.
-- Built internal logging system outputting to `/var/log/policy_banner_update.log`.
-- Designed for Jamf Pro modular deployment via custom triggers or postinstall actions.
+- Initial release.
+- Full support for `.rtfd` policy banner replacement with backup, ownership, permissions.
+- Structured logging system.
