@@ -37,6 +37,11 @@
 #   - Integrated full logging system to /var/log/policy_banner_update.log.
 #   - Designed script for modular deployment via Jamf Pro custom triggers or postinstall actions.
 #
+# Version 1.1.0 - 2025-04-26
+#   - Improved validate_filevault_banner function:
+#       - Added diskutil apfs updatePreboot / before checking preboot banner status.
+#       - Prevents false warnings by forcing preboot sync immediately after banner replacement.
+#
 #########################################################################################################################################################################
 
 set -o pipefail
@@ -161,11 +166,17 @@ replace_banner() {
 
 # Validate FileVault Preboot Banner
 validate_filevault_banner() {
+    log_info "Forcing preboot volume update to sync PolicyBanner..."
+    if ! diskutil apfs updatePreboot /; then
+        log_warn "Failed to update preboot volume. Preboot banner status might not be accurate."
+        return 0
+    fi
+    
     local preboot_banner="/private/var/db/.PolicyBanner"
     if [[ -e "$preboot_banner" ]]; then
-        log_info "Policy banner is configured for FileVault preboot screen"
+        log_info "Policy banner is configured for FileVault preboot screen."
     else
-        log_warn "Policy banner not configured for FileVault preboot screen"
+        log_warn "Policy banner not configured for FileVault preboot screen after update."
     fi
 }
 
