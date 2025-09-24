@@ -154,15 +154,15 @@ compare_banners() {
     fi
 
     if [[ ! -d "$CURRENT" ]]; then
-        log "No existing PolicyBanner found. Will install new one."
+        log_info "No existing PolicyBanner found. Will install new one."
         return 1
     fi
 
     if diff -qr "$NEW" "$CURRENT" >/dev/null; then
-        log "PolicyBanner content is the same. No update needed."
+        log_info "PolicyBanner content is the same. No update needed."
         return 0
     else
-        log "PolicyBanner content differs. Update required."
+        log_info "PolicyBanner content differs. Update required."
         return 1
     fi
 }
