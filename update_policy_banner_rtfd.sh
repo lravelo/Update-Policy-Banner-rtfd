@@ -53,6 +53,8 @@
 #   - Improved logging clarity for Preboot sync operations.
 #   - Ensured complete audit trail even when diskutil output lacks internal timestamps.
 #
+# Version 1.3.1 - 2025-09-24
+#   - Modified script to accomodate handling a zipped rtfd
 #########################################################################################################################################################################
 
 set -o pipefail
