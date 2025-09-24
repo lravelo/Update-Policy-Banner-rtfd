@@ -120,7 +120,8 @@ extract_banner() {
         log_error "zip file not found in $STAGING_DIR"
         return 1
     fi
-    unzip -qou $ZIP_FILE_PATH -d $TEMP_DIR
+    unzip -qou "$ZIP_FILE_PATH" -d "$TEMP_DIR"
+    log_debug "Banner extracted to $TEMP_DIR"
 }
 
 # Validate the new banner exists
@@ -146,7 +147,7 @@ prepare_install_dir() {
 # Backup existing banner
 backup_existing_banner() {
     if [[ -d "$TARGET_BANNER_PATH" ]]; then
-        local backup_dir;
+        local backup_dir
         backup_dir="${TEMP_DIR}/PolicyBanner_backup_$(date +%Y%m%d%H%M%S).rtfd"
         if ! cp -R "$TARGET_BANNER_PATH" "$backup_dir"; then
             log_error "Failed to backup existing policy banner to $backup_dir"
@@ -191,7 +192,7 @@ validate_filevault_banner() {
     log_info "Starting Preboot volume update to sync PolicyBanner..."
     
     local update_log="${TEMP_DIR}/updatepreboot_output.log"
-    local start_time;
+    local start_time
     start_time="$(date '+%Y-%m-%d %H:%M:%S')"
     
     if ! diskutil apfs updatePreboot / > "$update_log" 2>&1; then
@@ -201,13 +202,12 @@ validate_filevault_banner() {
         return 0
     fi
     
-    local end_time;
+    local end_time
     end_time="$(date '+%Y-%m-%d %H:%M:%S')"
     log_info "Preboot volume update completed. Start: $start_time | End: $end_time"
     
     cat "$update_log" >> "$LOG_FILE"
     
-    # Filter clean summary for Jamf console
     if grep -q "Successfully wrote Encrypted Root PList File" "$update_log"; then
         log_info "Preboot update completed successfully."
     elif grep -q "Error" "$update_log"; then
@@ -216,12 +216,11 @@ validate_filevault_banner() {
         log_info "Preboot update completed with standard output."
     fi
     
-    # Version-aware check for policy banner
-    local os_major_version;
+    local os_major_version
     os_major_version=$(sw_vers -productVersion | awk -F '.' '{print $1}')
     
     if [[ "$os_major_version" -ge 14 ]]; then
-        log_info "Running macOS $os_major_version detected; skipping /private/var/db/.PolicyBanner check (not reliable on macOS 14+)."
+        log_info "Running macOS $os_major_version detected; skipping /private/var/db/.PolicyBanner check."
         return 0
     fi
     
@@ -240,7 +239,6 @@ cleanup() {
         log_debug "Temporary directory $TEMP_DIR cleaned up"
     fi
 }
-
 
 # Compare banners to see if current one needs replacing
 compare_banners() {
@@ -277,8 +275,8 @@ main() {
     prepare_log_file
     log_info "Starting policy banner update process"
 
-    extract_banner || return 1
     create_temp_dir || return 1
+    extract_banner || return 1
     validate_new_banner || return 1
     prepare_install_dir || return 1
     compare_banners || return 1
