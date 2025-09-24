@@ -251,7 +251,7 @@ main() {
     prepare_log_file
     log_info "Starting policy banner update process"
 
-    extract_banner() || return 1
+    extract_banner || return 1
     create_temp_dir || return 1
     validate_new_banner || return 1
     prepare_install_dir || return 1
