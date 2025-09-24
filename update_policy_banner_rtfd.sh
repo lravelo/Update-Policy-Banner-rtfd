@@ -143,30 +143,6 @@ prepare_install_dir() {
     fi
 }
 
-# Compare banners to see if current one needs replacing
-compare_banners() {
-    local NEW="${NEW_BANNER_PATH}"
-    local CURRENT="${TARGET_BANNER_PATH}"
-
-    if [[ ! -d "$NEW" ]]; then
-        log_error "New policy banner not found at $NEW"
-        return 1
-    fi
-
-    if [[ ! -d "$CURRENT" ]]; then
-        log_info "No existing PolicyBanner found. Will install new one."
-        return 1
-    fi
-
-    if diff -qr "$NEW" "$CURRENT" >/dev/null; then
-        log_info "PolicyBanner content is the same. No update needed."
-        return 0
-    else
-        log_info "PolicyBanner content differs. Update required."
-        return 1
-    fi
-}
-
 # Backup existing banner
 backup_existing_banner() {
     if [[ -d "$TARGET_BANNER_PATH" ]]; then
@@ -262,6 +238,32 @@ cleanup() {
     if [[ -d "$TEMP_DIR" ]]; then
         rm -rf "$TEMP_DIR"
         log_debug "Temporary directory $TEMP_DIR cleaned up"
+    fi
+}
+
+
+# Compare banners to see if current one needs replacing
+compare_banners() {
+    local NEW="${NEW_BANNER_PATH}"
+    local CURRENT="${TARGET_BANNER_PATH}"
+
+    if [[ ! -d "$NEW" ]]; then
+        log_error "New policy banner not found at $NEW"
+        return 1
+    fi
+
+    if [[ ! -d "$CURRENT" ]]; then
+        log_info "No existing PolicyBanner found. Will install new one."
+        return 1
+    fi
+
+    if diff -qr "$NEW" "$CURRENT" >/dev/null; then
+        log_info "PolicyBanner content is the same. No update needed."
+        cleanup
+        exit 0
+    else
+        log_info "PolicyBanner content differs. Update required."
+        return 1
     fi
 }
 
