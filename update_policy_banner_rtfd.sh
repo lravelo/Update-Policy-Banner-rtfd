@@ -120,8 +120,8 @@ extract_banner() {
         log_error "zip file not found in $STAGING_DIR"
         return 1
     fi
-    unzip -qou "$ZIP_FILE_PATH" -d "$TEMP_DIR"
-    log_debug "Banner extracted to $TEMP_DIR"
+    unzip -qou "$ZIP_FILE_PATH" -d "$STAGING_DIR"
+    log_debug "Banner extracted to $STAGING_DIR"
 }
 
 # Validate the new banner exists
@@ -237,6 +237,10 @@ cleanup() {
     if [[ -d "$TEMP_DIR" ]]; then
         rm -rf "$TEMP_DIR"
         log_debug "Temporary directory $TEMP_DIR cleaned up"
+    fi
+    if [[ -d "$ZIP_FILE_PATH" ]]; then
+        rm -rf "$ZIP_FILE_PATH"
+        log_debug "Zip file cleaned up"
     fi
 }
 
