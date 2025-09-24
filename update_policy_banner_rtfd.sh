@@ -62,6 +62,8 @@ set -e
 # Global Variables
 STAGING_DIR="/tmp"
 TEMP_DIR="${STAGING_DIR}/banner_temp"
+ZIP_FILE="new_policy_banner.rtfd.zip"
+ZIP_FILE_PATH="${STAGING_DIR}/${ZIP_FILE}"
 NEW_BANNER_NAME="new_policy_banner.rtfd"
 TARGET_BANNER_NAME="PolicyBanner.rtfd"
 NEW_BANNER_PATH="${STAGING_DIR}/${NEW_BANNER_NAME}"
@@ -110,6 +112,15 @@ create_temp_dir() {
         return 1
     fi
     log_debug "Temporary directory $TEMP_DIR created"
+}
+
+# Extract zip file containing .rtfd Banner
+extract_banner() {
+    if [[ ! -f "$ZIP_FILE_PATH" ]]; then
+        log_error "zip file not found in $STAGING_DIR"
+        return 1
+    fi
+    unzip -q $ZIP_FILE_PATH -d $TEMP_DIR
 }
 
 # Validate the new banner exists
@@ -239,7 +250,8 @@ main() {
     
     prepare_log_file
     log_info "Starting policy banner update process"
-    
+
+    extract_banner() || return 1
     create_temp_dir || return 1
     validate_new_banner || return 1
     prepare_install_dir || return 1
