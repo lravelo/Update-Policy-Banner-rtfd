@@ -120,7 +120,7 @@ extract_banner() {
         log_error "zip file not found in $STAGING_DIR"
         return 1
     fi
-    unzip -q $ZIP_FILE_PATH -d $TEMP_DIR
+    unzip -qou $ZIP_FILE_PATH -d $TEMP_DIR
 }
 
 # Validate the new banner exists
@@ -140,6 +140,30 @@ prepare_install_dir() {
             return 1
         fi
         log_info "Created $INSTALL_DIR"
+    fi
+}
+
+# Compare banners to see if current one needs replacing
+compare_banners() {
+    local NEW="${NEW_BANNER_PATH}"
+    local CURRENT="${TARGET_BANNER_PATH}"
+
+    if [[ ! -d "$NEW" ]]; then
+        log_error "New policy banner not found at $NEW"
+        return 1
+    fi
+
+    if [[ ! -d "$CURRENT" ]]; then
+        log "No existing PolicyBanner found. Will install new one."
+        return 1
+    fi
+
+    if diff -qr "$NEW" "$CURRENT" >/dev/null; then
+        log "PolicyBanner content is the same. No update needed."
+        return 0
+    else
+        log "PolicyBanner content differs. Update required."
+        return 1
     fi
 }
 
@@ -255,6 +279,7 @@ main() {
     create_temp_dir || return 1
     validate_new_banner || return 1
     prepare_install_dir || return 1
+    compare_banners || return 1
     backup_existing_banner || return 1
     remove_old_banner || return 1
     replace_banner || return 1
